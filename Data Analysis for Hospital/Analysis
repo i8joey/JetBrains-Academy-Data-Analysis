@@ -1,0 +1,55 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# retrieving data from text files
+general_df = pd.read_csv("C:\\Users\\Joseph\\PycharmProjects\\Data Analysis for Hospitals\\Data Analysis for Hospitals"
+                         "\\general.csv")
+prenatal_df = pd.read_csv("C:\\Users\\Joseph\\PycharmProjects\\Data Analysis for Hospitals\\Data Analysis for Hospitals"
+                          "\\prenatal.csv")
+sports_df = pd.read_csv("C:\\Users\\Joseph\\PycharmProjects\\Data Analysis for Hospitals\\Data Analysis for Hospitals"
+                        "\\sports.csv")
+
+# renaming column titles for prenatal/sports dataframe to match general
+prenatal_df.rename(columns={'Sex': 'gender', 'HOSPITAL': 'hospital'}, inplace=True)
+sports_df.rename(columns={'Hospital': 'hospital', 'Male/female': 'gender'}, inplace=True)
+
+# combining the three dataframes
+pd.set_option('display.max_columns', 8)
+hospital_df = pd.concat([general_df, prenatal_df, sports_df], ignore_index=True)
+# removing unnecessary column
+hospital_df.drop(columns=['Unnamed: 0'], inplace=True)
+# removes rows that do not have any values
+hospital_df.dropna(how='all', inplace=True)
+# replacing values so they all match
+hospital_df['gender'] = hospital_df['gender'].replace({'female': 'f', 'woman': 'f', 'male': 'm', 'man': 'm'})
+hospital_df.loc[(hospital_df['hospital']) == 'prenatal', ['gender']] = 'f'
+# fills the missing values with 0
+hospital_df.update(hospital_df[['bmi', 'diagnosis', 'blood_test', 'ecg', 'ultrasound', 'mri', 'xray', 'children',
+                                'months']].fillna(0))
+
+# Plotting a histogram with the patients ages from across all 3 hospitals
+fig = plt.figure(1)
+plt.hist(hospital_df['age'], edgecolor='white')
+plt.title("Age of patients")
+plt.ylabel('Number of patients')
+plt.xlabel('Age')
+
+# Plotting a pie chart showing the different types of diagnosis
+fig2 = plt.figure(2)
+diagnosis = ['Pregnancy', 'Cold', 'Stomach', 'Sprain', 'Dislocation', 'Fracture', 'Heart']
+plt.pie(hospital_df['diagnosis'].value_counts(), labels=diagnosis, autopct='%.1f%%')
+plt.title('Patient diagnosis')
+
+# Plotting a violin chart to show the difference in height between all 3 hospitals, the sports hospital
+# uses a different unit of measurement
+fig3 = plt.figure(3)
+data = hospital_df[['hospital', 'height']]
+labels = ['General', 'Prenatal', 'Sports']
+plt.violinplot([data[data.hospital == 'general']['height'].values,
+                data[data.hospital == 'prenatal']['height'].values,
+                data[data.hospital == 'sports']['height'].values])
+plt.xticks((1, 2, 3), labels)
+plt.title('Heights of patients')
+plt.ylabel('Height')
+# shows the 3 figures in 3 separate windows
+plt.show()
