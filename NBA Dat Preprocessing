@@ -1,0 +1,65 @@
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder
+import numpy as np
+
+
+def clean_data(file):
+    data = pd.read_csv(file)
+    data['b_day'] = pd.to_datetime(data['b_day'], format='%m/%d/%y')
+    data['draft_year'] = pd.to_datetime(data['draft_year'], format='%Y')
+    data['team'].fillna('No Team', inplace=True)
+    data['height'] = data['height'].str.split('/ ', expand=True)[1].astype('float')
+    data['weight'] = data['weight'].str.split(' ', expand=True)[3].astype('float')
+    data['salary'] = data['salary'].str.replace('$', '', regex=False).astype('float')
+    data['country'] = data['country'].agg(lambda x: 'Not-USA' if x != 'USA' else x)
+    data['draft_round'] = data['draft_round'].agg(lambda x: '0' if x == 'Undrafted' else x)
+    return data
+
+
+def feature_data(cleaned):
+    cleaned['version'] = cleaned['version'].agg(lambda x: '20' + x[-2:])
+    cleaned['version'] = pd.to_datetime(cleaned['version'], format='%Y')
+    cleaned['age'] = pd.DatetimeIndex(cleaned['version']).year - pd.DatetimeIndex(cleaned['b_day']).year
+    cleaned['experience'] = pd.DatetimeIndex(cleaned['version']).year - pd.DatetimeIndex(cleaned['draft_year']).year
+    cleaned['bmi'] = cleaned['weight']/cleaned['height'].pow(2)
+    cleaned.drop(['b_day', 'draft_year', 'weight', 'height', 'full_name', 'draft_peak', 'version', 'jersey', 'college']
+                 , axis=1, inplace=True)
+    return cleaned
+
+
+def multicol_data(data):
+    columns = ['rating', 'bmi', 'experience', 'age']
+    corr_names = []
+    corr_values = []
+    for i in columns:
+        for j in columns:
+            if i != j:
+                new_corr = data[[i, j]].corr()
+                if new_corr[i][j] > 0.5 or new_corr[i][j] < -0.5:
+                    corr_names.append(i)
+                    corr_names.append(j)
+    for i in corr_names:
+        corr_feat = data[['salary', i]].corr()
+        corr_values.append(corr_feat['salary'][i])
+    index = corr_values.index(min(corr_values))
+    return data.drop(corr_names[index], axis=1)
+
+
+def transform_data(df):
+    num = df.drop('salary', axis=1).select_dtypes('number')
+    cat = df.select_dtypes('object')
+    scalar = StandardScaler()
+    scalar.fit(num)
+    scaled_data = pd.DataFrame(scalar.fit_transform(num), columns=num.columns)
+    encoder = OneHotEncoder(sparse_output=False)
+    hot = pd.DataFrame(encoder.fit_transform(cat))
+    data = pd.concat([scaled_data, hot], axis=1)
+    print(data.to_string())
+    return data, df['salary']
+
+
+df_cleaned = clean_data('nba2k-full.csv')
+df_featured = feature_data(df_cleaned)
+df = multicol_data(df_featured)
+
